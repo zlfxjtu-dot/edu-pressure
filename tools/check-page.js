@@ -87,3 +87,18 @@ console.log('金字塔 区间上下线 line:', pedges.length, '(2 岗位 × 上�
 console.log('金字塔 viewBox:', pyr ? pyr.attributes.viewBox : 'N/A');
 const pleg = registry['pyramidLegend'];
 console.log('金字塔图例条目:', pleg ? pleg.children.length : 'N/A', '(应 2 = 岗位数)');
+
+// 口径标签：改成「专业」后，提示文字和每个人数框的说明都应跟着变
+const dim = registry['dimLabel'];
+const firstChip = seq && seq.children[0] && seq.children[0].children[1]
+  && seq.children[0].children[1].children[0];
+const countInput = firstChip && firstChip.children[1];
+console.log('');
+console.log('口径标签 改前:', JSON.stringify(dim.value), '/ 人数框 title:', countInput && countInput.title);
+dim.value = '专业';
+if (typeof dim.oninput === 'function') dim.oninput();
+console.log('口径标签 改后:', JSON.stringify(dim.value));
+console.log('  提示文字:', registry['seqHint'] ? registry['seqHint'].textContent : 'N/A');
+console.log('  人数框 title:', countInput ? countInput.title : 'N/A');
+console.log('  金字塔是否跟着变（应「否」——金字塔画的是人数，与口径标签无关）:',
+  registry['pyramid'].children.filter(c => c.tagName === 'rect').length, '个 rect');

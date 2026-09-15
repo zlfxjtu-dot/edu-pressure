@@ -34,6 +34,14 @@
 
   .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px; }
   .panel h2 { font-size: 14px; margin: 0 0 12px; font-weight: 650; }
+  /* 口径标签：平时看着就是标题的一部分，hover / 聚焦才显出是输入框。
+     这个模板不只装学历 —— 改成「专业」，标题、提示、人数框的说明全跟着走。 */
+  .panel h2 .dim { font: inherit; font-weight: inherit; color: inherit; background: transparent;
+    border: 1px dashed transparent; border-radius: 5px; padding: 0 3px;
+    width: 4.6em; text-align: center; }
+  .panel h2 .dim:hover { border-color: var(--chip-border); background: var(--chip); }
+  .panel h2 .dim:focus { border-color: var(--substitution); border-style: solid;
+    background: var(--chip); outline: none; }
   .panel .hint { font-size: 11.5px; color: var(--muted); margin: -6px 0 10px; }
 
   /* ---- 序列 ---- */
@@ -93,7 +101,8 @@
 <div class="app">
   <h1>学历序列就业压力 · 计算器</h1>
   <p class="sub">
-    左边拖动学历调整排序、把几个学历放进同一行 = 并列位次；每层填人数。
+    左边拖动调整排序、把几个放进同一行 = 并列位次；每层填人数。<br>
+    左栏标题里那个<b>可编辑的口径标签</b>默认是「学历」——改成「专业」，整套就按专业看人数。<br>
     右边填岗位（一个学历区间 + 类型），看区间内每层的<b>挤压阻力（上方）</b>与<b>替代压力（下方）</b>曲线。<br>
     普通岗上下不对称；考试岗只看分数和门槛，所有人面对同一个池子，压力 = 替代 = 区间内总人数（含本层），是一条<b>水平线</b>，只画一根。<br>
     颜色区分岗位，<b>实线 = 挤压</b>、<b>虚线 = 替代</b>；同一岗位的两根线永远同色。<br>
@@ -103,8 +112,10 @@
 
   <div class="main">
     <section class="panel">
-      <h2>学历序列</h2>
-      <div class="hint">拖学历到某一行 = 换位次 / 并列；↑↓ 调整行的顺序</div>
+      <h2><input id="dimLabel" class="dim" type="text" value="学历" maxlength="10"
+        title="这一列装什么：学历 / 专业 / 任意人群。改了这里，标题、提示、人数框的说明都跟着变"
+      >序列</h2>
+      <div class="hint" id="seqHint">拖学历到某一行 = 换位次 / 并列；↑↓ 调整行的顺序</div>
       <div id="sequence"></div>
       <button class="btn" id="addLayer">＋ 加学历</button>
 
@@ -167,6 +178,8 @@
   }
 
   var state = {
+    // 口径标签：这一列装的是什么。默认「学历」，改成「专业」整套就按专业看
+    dim: '学历',
     groups: groupsFromSequence(M.DEFAULT_SEQUENCE),
     jobs: M.DEFAULT_JOBS.map(function (j) {
       return { name: j.name, type: j.type, lower: j.lower, upper: j.upper };
@@ -187,11 +200,27 @@
   function allNames() { return flatSequence().map(function (l) { return l.name; }); }
 
   // ---------- 渲染：序列 ----------
-  var drag = null; // {name, fromTier}
+  var drag = null;             // {name, fromTier}
+  var countInputs = [];        // 人数输入框，口径变了只改它们的 title，不整块重绘
+
+  // 口径标签：改了就同步标题、提示、和每个人数框的说明。
+  // 只改 title 不动 DOM 结构 —— 否则每敲一个字就重绘一遍序列，没必要。
+  var DIM_DEFAULT = '学历';
+  function renderDim() {
+    var d = state.dim;
+    byId('seqHint').textContent =
+      '拖' + d + '到某一行 = 换位次 / 并列；↑↓ 调整行的顺序；每格填该' + d + '的人数';
+    countInputs.forEach(function (i) { i.title = d + '人数'; });
+  }
+  byId('dimLabel').oninput = function () {
+    state.dim = byId('dimLabel').value.trim() || DIM_DEFAULT;
+    renderDim();
+  };
 
   function renderSequence() {
     var box = byId('sequence');
     box.innerHTML = '';
+    countInputs.length = 0;
     state.groups.forEach(function (g, tier) {
       var grp = el('div', 'group');
       grp.dataset.tier = tier;
@@ -211,7 +240,8 @@
         chip.title = '拖到别的行 = 换位次/并列';
         var nm = el('span', 'nm', l.name);
         var inp = el('input'); inp.type = 'number'; inp.value = l.count; inp.min = 0;
-        inp.title = '人数';
+        inp.title = state.dim + '人数';
+        countInputs.push(inp);
         inp.oninput = function () { l.count = +inp.value || 0; renderOutputs(); };
         inp.onclick = function (ev) { ev.stopPropagation(); };
         var del = el('button', 'del', '×'); del.title = '删除';
