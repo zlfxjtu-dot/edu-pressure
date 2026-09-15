@@ -76,3 +76,8 @@ console.log('岗位卡片数:', jobs ? jobs.children.length : 'N/A', '(默认 2�
 console.log('曲线 path:', count('path'), '(2 岗位 × 2 条 = 4)');
 console.log('曲线数据点 circle:', count('circle'), '(本科岗 5 层 + 硕士岗 5 层，各 ×2 = 20)');
 console.log('Y 轴网格 line:', count('line'), '(对数轴 9 条 1-2-5 刻度 + 1 条并列下划线 = 10)');
+
+const pyr = registry['pyramid'];
+const pcount = (tag) => (pyr ? pyr.children.filter(c => c.tagName === tag).length : 0);
+console.log('金字塔 rect:', pcount('rect'), '(应 8 = 序列层数)');
+console.log('金字塔 viewBox:', pyr ? pyr.attributes.viewBox : 'N/A');

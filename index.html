@@ -84,6 +84,8 @@
   .params .hint { flex-basis: 100%; margin: 0; }
   svg text { font-family: inherit; }
   .chart-wrap { overflow-x: auto; }
+  /* 左栏的人数金字塔：宽度跟随面板，高度由行数决定（viewBox 动态设） */
+  #pyramid { display: block; width: 100%; height: auto; margin-top: 2px; }
   .empty { color: var(--muted); font-size: 12.5px; padding: 24px; text-align: center; }
 </style>
 </head>
@@ -105,6 +107,13 @@
       <div class="hint">拖学历到某一行 = 换位次 / 并列；↑↓ 调整行的顺序</div>
       <div id="sequence"></div>
       <button class="btn" id="addLayer">＋ 加学历</button>
+
+      <h2 style="margin-top:18px">人数金字塔</h2>
+      <div class="hint">
+        按位次自下而上排。柱长 = 该层人数（就是上面你填的原始输入，和岗位无关）。<br>
+        整体是金字塔形，但<b>不保证单调收窄</b>——默认数据在硕士段就有个凸起：本科毕业去读研，人堆在那一档。
+      </div>
+      <svg id="pyramid" viewBox="0 0 382 200"></svg>
     </section>
 
     <section class="panel">
@@ -202,7 +211,7 @@
         var nm = el('span', 'nm', l.name);
         var inp = el('input'); inp.type = 'number'; inp.value = l.count; inp.min = 0;
         inp.title = '人数';
-        inp.oninput = function () { l.count = +inp.value || 0; renderChart(); };
+        inp.oninput = function () { l.count = +inp.value || 0; renderOutputs(); };
         inp.onclick = function (ev) { ev.stopPropagation(); };
         var del = el('button', 'del', '×'); del.title = '删除';
         del.onclick = function () {
@@ -576,9 +585,97 @@
     return String(Math.round(v));
   }
 
+  // ---------- 渲染：人数金字塔 ----------
+  // 画的是「本层人数」这个原始输入 —— 和岗位无关，所以放在左栏序列面板下面。
+  // 挤压/替代是跟着岗位变的（两个岗位就是两套），塞进左栏会和右栏重复。
+  //
+  // 方向按位次**自下而上**：位次最低（二本，人最多）画在最底、最宽，
+  // 往上逐层收窄。这个形状本身就是真实结构 —— 学历越高，人越少。
+  function renderPyramid() {
+    var svg = byId('pyramid');
+    if (!svg) return;
+    svg.innerHTML = '';
+    var seq = flatSequence();                 // 顺序 = tier 从低到高
+    if (!seq.length) return;
+
+    var W = 382, padL = 74, padR = 46, padT = 8, padB = 28, rowH = 20;
+    var H = padT + seq.length * rowH + padB;
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+
+    var plotW = W - padL - padR;
+    var max = 1;
+    seq.forEach(function (l) { if (l.count > max) max = l.count; });
+    var full = niceMax(max);                  // 刻度上限，取 1/2/5×10^n
+
+    function xAt(v) { return padL + v / full * plotW; }
+
+    // 竖网格 + 底部刻度：1-2-5 取值，标签才是整数
+    var ticks = [0];
+    for (var p = 0; p <= 8; p++) {
+      [1, 2, 5].forEach(function (m) {
+        var v = m * Math.pow(10, p);
+        if (v >= full / 10 && v <= full) ticks.push(v);
+      });
+    }
+    ticks.forEach(function (v) {
+      var xx = xAt(v);
+      var gl = elSvg('line');
+      gl.setAttribute('x1', xx); gl.setAttribute('x2', xx);
+      gl.setAttribute('y1', padT); gl.setAttribute('y2', padT + seq.length * rowH);
+      gl.setAttribute('stroke', '#e1e0d9'); gl.setAttribute('stroke-width', 1);
+      svg.appendChild(gl);
+      var tx = elSvg('text');
+      tx.textContent = fmt(v);
+      tx.setAttribute('x', xx); tx.setAttribute('y', padT + seq.length * rowH + 13);
+      tx.setAttribute('text-anchor', 'middle'); tx.setAttribute('font-size', 9.5);
+      tx.setAttribute('fill', '#898781');
+      svg.appendChild(tx);
+    });
+
+    var n = seq.length;
+    seq.forEach(function (l, i) {
+      var y = padT + (n - 1 - i) * rowH;      // i=0（位次最低）落到最下面一行
+      var w = l.count / full * plotW;
+
+      var rect = elSvg('rect');
+      rect.setAttribute('x', padL); rect.setAttribute('y', y + 3.5);
+      rect.setAttribute('width', Math.max(w, 0)); rect.setAttribute('height', rowH - 7);
+      rect.setAttribute('fill', '#8496a8'); rect.setAttribute('rx', 2);
+      svg.appendChild(rect);
+
+      var nm = elSvg('text');
+      nm.textContent = l.name;
+      nm.setAttribute('x', padL - 6); nm.setAttribute('y', y + rowH / 2 + 3.5);
+      nm.setAttribute('text-anchor', 'end'); nm.setAttribute('font-size', 10);
+      nm.setAttribute('fill', '#52514e');
+      svg.appendChild(nm);
+
+      // 人数标在柱右端外侧（padR 就是给它留的位置，不会溢出）
+      var cv = elSvg('text');
+      cv.textContent = fmt(l.count);
+      cv.setAttribute('x', padL + w + 4); cv.setAttribute('y', y + rowH / 2 + 3.5);
+      cv.setAttribute('font-size', 9.5); cv.setAttribute('fill', '#898781');
+      svg.appendChild(cv);
+    });
+  }
+
+  // 刻度上限：不小于 v 的最小 1/2/5×10^n
+  function niceMax(v) {
+    if (!(v > 0)) return 1;
+    var p = 1;
+    while (p * 10 <= v) p *= 10;
+    while (p > v) p /= 10;
+    if (p >= v) return p;
+    if (2 * p >= v) return 2 * p;
+    if (5 * p >= v) return 5 * p;
+    return 10 * p;
+  }
+
   // ---------- 汇总 ----------
+  // 人数金字塔不依赖岗位和参数，只有层数/人数变了才需要重画
+  function renderOutputs() { renderChart(); renderPyramid(); }
   function renderLegend() { renderChart(); }
-  function renderAll() { renderSequence(); renderJobs(); renderChart(); }
+  function renderAll() { renderSequence(); renderJobs(); renderOutputs(); }
 
   renderAll();
 })();

@@ -85,5 +85,24 @@ out.push('');
 out.push('--- 坐标轴文字 ---');
 texts.forEach(t => out.push(`"${t.textContent}" @ (${t.attributes.x},${t.attributes.y})`));
 
+// ---------- 人数金字塔（左栏，独立 SVG）----------
+const pyr = registry['pyramid'];
+if (pyr) {
+  out.push('');
+  out.push('===== 人数金字塔 =====');
+  out.push(`viewBox=${pyr.attributes.viewBox}`);
+  const kids = pyr.children;
+  out.push(`rect=${kids.filter(c => c.tagName === 'rect').length}  line=${kids.filter(c => c.tagName === 'line').length}  text=${kids.filter(c => c.tagName === 'text').length}`);
+  const rects = kids.filter(c => c.tagName === 'rect');
+  const txts = kids.filter(c => c.tagName === 'text');
+  out.push('--- 柱（绘制顺序 = 从上往下）---');
+  rects.forEach((r, i) => {
+    const mid = parseFloat(r.attributes.y) + parseFloat(r.attributes.height) / 2 + 3.5;
+    const row = txts.filter(t => Math.abs(parseFloat(t.attributes.y) - mid) < 1.2)
+      .map(t => (t.attributes['text-anchor'] === 'end' ? '名=' : '值=') + t.textContent);
+    out.push(`[${i}] y=${parseFloat(r.attributes.y).toFixed(1)}  宽=${parseFloat(r.attributes.width).toFixed(1)}  ${row.join('  ')}`);
+  });
+}
+
 fs.writeFileSync(path.join(ROOT, '_svg-dump.txt'), out.join('\n'), 'utf8');
 console.log(out.join('\n'));
