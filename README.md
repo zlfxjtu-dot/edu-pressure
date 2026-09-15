@@ -1,8 +1,10 @@
 # 学历序列就业压力测算
 
+▶ **在线使用：[zlfxjtu-dot.github.io/edu-pressure](https://zlfxjtu-dot.github.io/edu-pressure/)** —— 打开即用，手机上也能开
+
 把一条「学历序列」（二本 → 双非 → 211本 → 双非硕 → 985本 → 211硕 → 985硕 → 双九硕）摆成一根位次轴，看某个岗位的招聘区间里，**每一层学历同时受到多大的挤压和替代**。
 
-打开 [`index.html`](index.html) 就能用——不用构建、不用装依赖、不用起服务。
+也可以下载后直接打开 [`index.html`](index.html)——不用构建、不用装依赖、不用起服务。
 
 > ⚠️ **仓库里的数字是示意数据**，只为演示模型怎么算，不是任何真实统计。换成你自己的口径再用。
 
@@ -46,7 +48,7 @@
 
 ## 文件
 
-```
+```text
 index.html              交互页面（单文件，内联脚本 + 引 src/pressure.js）
 src/pressure.js         计算引擎（UMD，浏览器和 Node 通用，纯函数）
 test/pressure.test.js   引擎测试，17 条
