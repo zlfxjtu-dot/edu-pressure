@@ -95,7 +95,7 @@
   <p class="sub">
     左边拖动学历调整排序、把几个学历放进同一行 = 并列位次；每层填人数。
     右边填岗位（一个学历区间 + 类型），看区间内每层的<b>挤压阻力（上方）</b>与<b>替代压力（下方）</b>曲线。<br>
-    普通岗上下不对称；考试岗只看分数和门槛，压力 = 替代（两根曲线重合）。<br>
+    普通岗上下不对称；考试岗只看分数和门槛，压力 = 替代，所以只画一根线。<br>
     颜色区分岗位，<b>实线 = 挤压</b>、<b>虚线 = 替代</b>；同一岗位的两根线永远同色。<br>
     区间不是硬墙：区间外的学历按<b>边界渗透</b>折算计入，每层再垫一笔<b>基准竞争</b>——所以曲线两端都不会真的归零。
     纵轴默认<b>对数</b>，否则 500 和 10 万挤在同一根线性轴上，低的那头看不出来。
@@ -465,23 +465,33 @@
     all.forEach(function (r, ji) {
       var isExam = r.job.type === 'exam';
       var jobColor = JOB_COLORS[ji % JOB_COLORS.length];
+      function line(field, dashed) {
+        drawCurve(svg, r.rows.map(function (row) {
+          return { x: xAt(idxByName[row.name]), y: yAt(row[field]) };
+        }), jobColor, dashed);
+      }
 
-      // 挤压阻力（实线）
-      drawCurve(svg, r.rows.map(function (row) {
-        return { x: xAt(idxByName[row.name]), y: yAt(row.pressure) };
-      }), jobColor, false);
-
-      // 替代压力（虚线）
-      drawCurve(svg, r.rows.map(function (row) {
-        return { x: xAt(idxByName[row.name]), y: yAt(row.substitution) };
-      }), jobColor, true);
+      // 考试岗在引擎里 pressure === substitution（同一个值），画两遍就是同一根线叠两次：
+      // 后画的虚线盖在前面的实线上，看上去是条虚线，图例却写着「实线 = 挤压」，对不上。
+      // 所以考试岗只画一根。
+      if (isExam) {
+        line('pressure', false);
+      } else {
+        line('pressure', false);       // 挤压阻力（实线）
+        line('substitution', true);    // 替代压力（虚线）
+      }
 
       // 图例：小线段和图上样式一致，色 + 线型都对得上
       var ln = el('span');
-      ln.appendChild(swatch(jobColor, false));
-      ln.appendChild(document.createTextNode(r.job.name + '·挤压'));
-      ln.appendChild(swatch(jobColor, true));
-      ln.appendChild(document.createTextNode(r.job.name + '·替代' + (isExam ? '（=挤压）' : '')));
+      if (isExam) {
+        ln.appendChild(swatch(jobColor, false));
+        ln.appendChild(document.createTextNode(r.job.name + '·挤压 = 替代'));
+      } else {
+        ln.appendChild(swatch(jobColor, false));
+        ln.appendChild(document.createTextNode(r.job.name + '·挤压'));
+        ln.appendChild(swatch(jobColor, true));
+        ln.appendChild(document.createTextNode(r.job.name + '·替代'));
+      }
       legend.appendChild(ln);
     });
   }
