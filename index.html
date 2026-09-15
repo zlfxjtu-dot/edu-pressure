@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>学历序列就业压力 · 计算器</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface: #fcfcfb; --page: #f9f9f7;
+    --ink: #0b0b0b; --ink2: #52514e; --muted: #898781;
+    --line: #e1e0d9; --baseline: #c3c2b7;
+    --pressure: #eb6834;   /* 挤压阻力（上方） */
+    --substitution: #2a78d6; /* 替代压力（下方） */
+    --chip: #ffffff; --chip-border: #d9d8d0;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { color-scheme: dark;
+      --surface: #1a1a19; --page: #0d0d0d;
+      --ink: #ffffff; --ink2: #c3c2b7; --muted: #898781;
+      --line: #2c2c2a; --baseline: #383835;
+      --pressure: #d95926; --substitution: #3987e5;
+      --chip: #232322; --chip-border: #383835;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px; background: var(--page); color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; }
+  .app { max-width: 1180px; margin: 0 auto; }
+  h1 { font-size: 20px; margin: 0 0 4px; font-weight: 650; }
+  .sub { font-size: 13px; color: var(--ink2); margin: 0 0 20px; line-height: 1.5; }
+  .main { display: grid; grid-template-columns: 420px 1fr; gap: 20px; align-items: start; }
+  @media (max-width: 900px) { .main { grid-template-columns: 1fr; } }
+
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px; }
+  .panel h2 { font-size: 14px; margin: 0 0 12px; font-weight: 650; }
+  .panel .hint { font-size: 11.5px; color: var(--muted); margin: -6px 0 10px; }
+
+  /* ---- 序列 ---- */
+  .group { display: flex; align-items: center; gap: 6px; padding: 4px 6px; margin: 2px 0;
+    border: 1.5px dashed transparent; border-radius: 8px; min-height: 42px; }
+  .group.drag-over { border-color: var(--substitution); background: rgba(42,120,214,0.06); }
+  .move { flex: 0 0 auto; display: flex; flex-direction: column; gap: 2px; }
+  .move button { width: 20px; height: 16px; font-size: 10px; line-height: 1; padding: 0;
+    border: 1px solid var(--line); background: var(--surface); color: var(--ink2); border-radius: 4px; cursor: pointer; }
+  .move button:hover { background: var(--line); }
+  .layers { flex: 1 1 auto; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; background: var(--chip);
+    border: 1px solid var(--chip-border); border-radius: 8px; padding: 5px 8px;
+    font-size: 13px; cursor: grab; user-select: none; }
+  .chip.dragging { opacity: 0.4; }
+  .chip .nm { font-weight: 600; }
+  .chip input { width: 64px; font-size: 12.5px; padding: 2px 4px; border: 1px solid var(--line);
+    border-radius: 4px; background: var(--surface); color: var(--ink); font-variant-numeric: tabular-nums; }
+  .chip .del { cursor: pointer; color: var(--muted); font-size: 14px; border: none; background: none; padding: 0 2px; }
+  .chip .del:hover { color: var(--pressure); }
+  .tier-tag { flex: 0 0 auto; font-size: 10.5px; color: var(--muted); writing-mode: vertical-rl; text-align: center; }
+  .btn { margin-top: 10px; font-size: 12.5px; padding: 6px 12px; border: 1px solid var(--line);
+    background: var(--surface); color: var(--ink); border-radius: 8px; cursor: pointer; }
+  .btn:hover { background: var(--line); }
+  .btn.primary { background: var(--substitution); border-color: var(--substitution); color: #fff; }
+  .btn.primary:hover { filter: brightness(1.08); }
+
+  /* ---- 岗位 ---- */
+  .job { border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+  .job .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 6px; }
+  .job label { font-size: 11.5px; color: var(--ink2); }
+  .job input[type=text], .job select { font-size: 12.5px; padding: 4px 6px; border: 1px solid var(--line);
+    border-radius: 6px; background: var(--surface); color: var(--ink); }
+  .job input[type=text].nm { width: 140px; }
+  .job .del-job { margin-left: auto; font-size: 12px; color: var(--muted); border: none; background: none; cursor: pointer; }
+  .job .del-job:hover { color: var(--pressure); }
+
+  /* ---- 曲线 ---- */
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; color: var(--ink2); margin-bottom: 8px; }
+  .legend svg { display: inline-block; }
+  .params { display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
+    font-size: 12px; color: var(--ink2); margin: 0 0 10px; }
+  .params label { display: inline-flex; align-items: center; gap: 5px; }
+  .params input { width: 70px; padding: 3px 6px; font: inherit; text-align: right;
+    border: 1px solid var(--line); border-radius: 5px; background: var(--chip); color: var(--ink); }
+  .params select { padding: 3px 4px; font: inherit; border: 1px solid var(--line);
+    border-radius: 5px; background: var(--chip); color: var(--ink); }
+  .params .hint { flex-basis: 100%; margin: 0; }
+  svg text { font-family: inherit; }
+  .chart-wrap { overflow-x: auto; }
+  .empty { color: var(--muted); font-size: 12.5px; padding: 24px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>学历序列就业压力 · 计算器</h1>
+  <p class="sub">
+    左边拖动学历调整排序、把几个学历放进同一行 = 并列位次；每层填人数。
+    右边填岗位（一个学历区间 + 类型），看区间内每层的<b>挤压阻力（上方）</b>与<b>替代压力（下方）</b>曲线。<br>
+    普通岗上下不对称；考试岗只看分数和门槛，压力 = 替代（两根曲线重合）。<br>
+    颜色区分岗位，<b>实线 = 挤压</b>、<b>虚线 = 替代</b>；同一岗位的两根线永远同色。<br>
+    区间不是硬墙：区间外的学历按<b>边界渗透</b>折算计入，每层再垫一笔<b>基准竞争</b>——所以曲线两端都不会真的归零。
+    纵轴默认<b>对数</b>，否则 500 和 10 万挤在同一根线性轴上，低的那头看不出来。
+  </p>
+
+  <div class="main">
+    <section class="panel">
+      <h2>学历序列</h2>
+      <div class="hint">拖学历到某一行 = 换位次 / 并列；↑↓ 调整行的顺序</div>
+      <div id="sequence"></div>
+      <button class="btn" id="addLayer">＋ 加学历</button>
+    </section>
+
+    <section class="panel">
+      <h2>岗位</h2>
+      <div id="jobs"></div>
+      <button class="btn" id="addJob">＋ 加岗位</button>
+
+      <h2 style="margin-top:18px">压力 / 替代曲线</h2>
+      <div class="params">
+        <label>边界渗透
+          <input id="spillover" type="number" min="0" max="1" step="0.05" value="0.15">
+        </label>
+        <label>基准竞争
+          <input id="baseline" type="number" min="0" step="100" value="500">
+        </label>
+        <label>纵轴
+          <select id="yscale">
+            <option value="log" selected>对数</option>
+            <option value="linear">线性</option>
+          </select>
+        </label>
+        <span class="hint">
+          渗透：区间外紧邻的学历按这个比例计入（再往外按幂衰减）。基准：每层垫的底，让序列两端也不归零。<br>
+          纵轴：数据跨了 200 倍，线性轴下最小的那截（500）只占全高 0.5%，必然贴死底边。
+          对数轴把下界压到最小值以下一整档（200），最低点浮在底线之上；代价是纵向间距读的是<b>倍数</b>不是<b>人数差</b>。
+        </span>
+      </div>
+      <div class="legend" id="legend"></div>
+      <div class="chart-wrap"><svg id="chart" width="660" height="360"></svg></div>
+    </section>
+  </div>
+</div>
+
+<script src="src/pressure.js"></script>
+<script>
+(function () {
+  'use strict';
+  var M = window.PressureModel;
+
+  // ---------- 状态 ----------
+  // 初始序列 / 岗位都取自引擎的默认值，不在页面里再抄一份（抄了两边会漂）
+  // groups: [{ layers: [{name, count}] }]，group 的 index = tier
+  function groupsFromSequence(seq) {
+    var maxTier = 0;
+    seq.forEach(function (l) { if (l.tier > maxTier) maxTier = l.tier; });
+    var groups = [];
+    for (var t = 0; t <= maxTier; t++) groups.push({ layers: [] });
+    seq.forEach(function (l) { groups[l.tier].layers.push({ name: l.name, count: l.count }); });
+    return groups;
+  }
+
+  var state = {
+    groups: groupsFromSequence(M.DEFAULT_SEQUENCE),
+    jobs: M.DEFAULT_JOBS.map(function (j) {
+      return { name: j.name, type: j.type, lower: j.lower, upper: j.upper };
+    }),
+  };
+
+  // ---------- 工具 ----------
+  function byId(id) { return document.getElementById(id); }
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function elSvg(tag) { return document.createElementNS('http://www.w3.org/2000/svg', tag); }
+  function flatSequence() {
+    var seq = [];
+    state.groups.forEach(function (g, tier) {
+      g.layers.forEach(function (l) { seq.push({ name: l.name, count: +l.count || 0, tier: tier }); });
+    });
+    return seq;
+  }
+  function allNames() { return flatSequence().map(function (l) { return l.name; }); }
+
+  // ---------- 渲染：序列 ----------
+  var drag = null; // {name, fromTier}
+
+  function renderSequence() {
+    var box = byId('sequence');
+    box.innerHTML = '';
+    state.groups.forEach(function (g, tier) {
+      var grp = el('div', 'group');
+      grp.dataset.tier = tier;
+      grp._group = g;
+
+      var mv = el('div', 'move');
+      var up = el('button', null, '↑'); up.title = '上移一行';
+      var dn = el('button', null, '↓'); dn.title = '下移一行';
+      up.onclick = function () { moveGroup(tier, -1); };
+      dn.onclick = function () { moveGroup(tier, +1); };
+      mv.appendChild(up); mv.appendChild(dn);
+
+      var layers = el('div', 'layers');
+      g.layers.forEach(function (l) {
+        var chip = el('div', 'chip');
+        chip.draggable = true;
+        chip.title = '拖到别的行 = 换位次/并列';
+        var nm = el('span', 'nm', l.name);
+        var inp = el('input'); inp.type = 'number'; inp.value = l.count; inp.min = 0;
+        inp.title = '人数';
+        inp.oninput = function () { l.count = +inp.value || 0; renderChart(); };
+        inp.onclick = function (ev) { ev.stopPropagation(); };
+        var del = el('button', 'del', '×'); del.title = '删除';
+        del.onclick = function () {
+          g.layers = g.layers.filter(function (x) { return x !== l; });
+          if (!g.layers.length) state.groups.splice(tier, 1);
+          renderAll();
+        };
+        chip.appendChild(nm); chip.appendChild(inp); chip.appendChild(del);
+        chip.addEventListener('dragstart', function () {
+          drag = { name: l.name, fromTier: tier };
+          chip.classList.add('dragging');
+        });
+        chip.addEventListener('dragend', function () { chip.classList.remove('dragging'); });
+        layers.appendChild(chip);
+      });
+
+      // drop target：整个 group
+      grp.addEventListener('dragover', function (ev) { ev.preventDefault(); grp.classList.add('drag-over'); });
+      grp.addEventListener('dragleave', function () { grp.classList.remove('drag-over'); });
+      grp.addEventListener('drop', function (ev) {
+        ev.preventDefault(); grp.classList.remove('drag-over');
+        if (!drag) return;
+        moveLayerTo(drag.name, grp._group);
+        drag = null;
+      });
+
+      var tag = el('div', 'tier-tag', '位次 ' + (tier + 1));
+      grp.appendChild(mv); grp.appendChild(layers); grp.appendChild(tag);
+      box.appendChild(grp);
+    });
+  }
+
+  function moveGroup(tier, delta) {
+    var to = tier + delta;
+    if (to < 0 || to >= state.groups.length) return;
+    var tmp = state.groups[tier]; state.groups[tier] = state.groups[to]; state.groups[to] = tmp;
+    renderAll();
+  }
+  // 拖到某行 = 并进该行（并列）；拖到原位 = 无操作
+  function moveLayerTo(name, targetGroup) {
+    if (targetGroup.layers.some(function (l) { return l.name === name; })) return;
+    var layer = null;
+    for (var t = 0; t < state.groups.length; t++) {
+      state.groups[t].layers = state.groups[t].layers.filter(function (l) {
+        if (l.name === name) { layer = l; return false; } return true;
+      });
+    }
+    if (!layer) return;
+    state.groups = state.groups.filter(function (g) { return g.layers.length; });
+    targetGroup.layers.push(layer);
+    renderAll();
+  }
+
+  byId('addLayer').onclick = function () {
+    var name = prompt('学历名称（如 博士 / 大专）');
+    if (!name) return;
+    var count = prompt('人数', '0');
+    state.groups.push({ layers: [{ name: name, count: +count || 0 }] });
+    renderAll();
+  };
+
+  // ---------- 渲染：岗位 ----------
+  function renderJobs() {
+    var box = byId('jobs');
+    box.innerHTML = '';
+    var names = allNames();
+    state.jobs.forEach(function (job, i) {
+      var card = el('div', 'job');
+
+      var r1 = el('div', 'row');
+      r1.appendChild(el('label', null, '岗位'));
+      var nm = el('input', 'nm'); nm.type = 'text'; nm.value = job.name;
+      nm.oninput = function () { job.name = nm.value; renderLegend(); };
+      var del = el('button', 'del-job', '删除');
+      del.onclick = function () { state.jobs.splice(i, 1); renderJobs(); renderAll(); };
+      r1.appendChild(nm);
+      var type = el('select');
+      [['normal', '普通岗'], ['exam', '考试类']].forEach(function (t) {
+        var o = el('option', null, t[1]); o.value = t[0];
+        if (job.type === t[0]) o.selected = true;
+        type.appendChild(o);
+      });
+      type.onchange = function () { job.type = type.value; renderChart(); };
+      r1.appendChild(type); r1.appendChild(del);
+
+      var r2 = el('div', 'row');
+      r2.appendChild(el('label', null, '区间'));
+      var lower = mkSelect(names, job.lower);
+      lower.onchange = function () { job.lower = lower.value; renderChart(); };
+      r2.appendChild(el('span', null, '~'));
+      var upper = mkSelect(names, job.upper);
+      upper.onchange = function () { job.upper = upper.value; renderChart(); };
+      r2.appendChild(lower); r2.appendChild(upper);
+
+      card.appendChild(r1); card.appendChild(r2);
+      box.appendChild(card);
+    });
+  }
+  function mkSelect(names, sel) {
+    var s = el('select');
+    names.forEach(function (n) {
+      var o = el('option', null, n); o.value = n; if (n === sel) o.selected = true;
+      s.appendChild(o);
+    });
+    return s;
+  }
+  // 渗透率 / 基准竞争 / 纵轴刻度：输入框是单一真相，改了就重画曲线
+  function readParams() {
+    var k = parseFloat(byId('spillover').value);
+    var b = parseFloat(byId('baseline').value);
+    var y = byId('yscale').value;
+    return {
+      spillover: isNaN(k) ? M.DEFAULT_SPILLOVER : Math.max(0, Math.min(1, k)),
+      baseline: isNaN(b) ? M.DEFAULT_BASELINE : Math.max(0, b),
+      yscale: y === 'linear' ? 'linear' : 'log',
+    };
+  }
+  ['spillover', 'baseline'].forEach(function (id) {
+    byId(id).oninput = function () { renderChart(); };
+  });
+  // select 的 input 事件各家浏览器fire得不一样，change 一定fire，两个都挂
+  byId('yscale').onchange = function () { renderChart(); };
+  byId('yscale').oninput = function () { renderChart(); };
+
+  byId('addJob').onclick = function () {
+    var names = allNames();
+    state.jobs.push({ name: '新岗位', type: 'normal', lower: names[0], upper: names[names.length - 1] });
+    renderAll();
+  };
+
+  // ---------- 渲染：曲线 ----------
+  function renderChart() {
+    var COL = { pressure: '#eb6834', substitution: '#2a78d6', line: '#e1e0d9', muted: '#898781', ink2: '#52514e' };
+    // 岗位配色：色相编码「哪个岗位」，实线 / 虚线编码「挤压 / 替代」。
+    // 旧方案用颜色编码压力类型，结果两个岗位的挤压都是橙、替代都是蓝，四根线挤在两种颜色里分不开。
+    var JOB_COLORS = ['#eb6834', '#2a78d6', '#2f8f5b', '#8a5cd6', '#c2418f', '#a1740f'];
+    var svg = byId('chart');
+    var legend = byId('legend');
+    svg.innerHTML = ''; legend.innerHTML = '';
+
+    var seq = flatSequence();
+    var P = readParams();
+    var all = M.solveAll(seq, state.jobs, P);
+    if (!seq.length || !state.jobs.length) {
+      var emptyT = elSvg('text'); emptyT.textContent = '暂无数据';
+      emptyT.setAttribute('x', 20); emptyT.setAttribute('y', 24);
+      svg.appendChild(emptyT);
+      return;
+    }
+
+    var W = 660, H = 360, padL = 56, padR = 16, padT = 16, padB = 40;
+    var plotW = W - padL - padR, plotH = H - padT - padB;
+
+    // Y 范围：下界不取 0。渗透 + 基准之后两端本来就不会真的归零，
+    // 纵轴从 0 起只会让曲线贴死在 x 轴上，差异全被压扁。
+    //
+    // 但「不取 0」还不够：默认数据跨了 200 倍（500 ~ 10.6万），
+    // 线性轴上 500 只占全高 0.5%，照样贴底。所以默认走对数轴 ——
+    // 对数轴下 500→1000 的间距 = 1000→2000 的间距，尾巴自然抬起来。
+    // 线性轴留成开关：纵向间距读「人数差」比对数直观，代价是两端挤在一起。
+    var maxVal = 0, minVal = Infinity;
+    all.forEach(function (r) { r.rows.forEach(function (row) {
+      maxVal = Math.max(maxVal, row.pressure, row.substitution);
+      minVal = Math.min(minVal, row.pressure, row.substitution);
+    }); });
+    if (!isFinite(minVal)) minVal = 0;
+
+    var yAt, yTicks = [];
+
+    if (P.yscale === 'log') {
+      // 下界：取「比最小值还小 2.5 倍以上的那个 1-2-5 刻度」。
+      //
+      // 这一步是上一版踩的坑：当时下界取 最小值÷2，而默认数据的最小值是 500
+      // （正好是个 1-2-5 刻度），于是最低那条网格线就落在 500 上 ——
+      // 曲线压着最低网格线，下面留多少空白都没用，看上去还是贴着底边。
+      // 下界必须**低于最小值一整档**，最低点才会浮在底线之上。
+      var lgLo = tickFloor(Math.max(minVal, 0.5) / 2.5);
+      var lgHi = Math.max(maxVal, lgLo * 10) * 1.6;
+      var lg = function (v) { return Math.log10(Math.max(v, lgLo)); };
+      var lgSpan = Math.log10(lgHi) - Math.log10(lgLo);
+      yAt = function (v) { return padT + plotH - (lg(v) - Math.log10(lgLo)) / lgSpan * plotH; };
+      // 1-2-5 刻度：对数轴上「等距」本身就是等倍数，刻度取整数字面比均分好读
+      for (var p = 0; p <= 8; p++) {
+        [1, 2, 5].forEach(function (m) {
+          var v = m * Math.pow(10, p);
+          if (v >= lgLo * 0.999 && v <= lgHi * 0.96) yTicks.push(v);
+        });
+      }
+    } else {
+      // 线性：下界取最小值的 85%，刻度照标真实值（截断轴，不是假的）
+      var yMin = minVal * 0.85;
+      var yMax = maxVal * 1.05;
+      if (yMax - yMin < 1) yMax = yMin + 1;
+      yAt = function (v) { return padT + plotH - (v - yMin) / (yMax - yMin) * plotH; };
+      for (var q = 0; q <= 5; q++) yTicks.push(yMin + (yMax - yMin) * q / 5);
+    }
+
+    // X 轴：按 tier 顺序列出全部学历（含并列）
+    var xs = seq.map(function (l, i) { return { name: l.name, tier: l.tier, i: i }; });
+    var n = xs.length;
+    function xAt(i) { return padL + (n === 1 ? plotW / 2 : i / (n - 1) * plotW); }
+
+    // 网格 + Y 轴刻度
+    yTicks.forEach(function (v) {
+      var yy = yAt(v);
+      var gl = elSvg('line'); gl.setAttribute('x1', padL); gl.setAttribute('x2', W - padR);
+      gl.setAttribute('y1', yy); gl.setAttribute('y2', yy);
+      gl.setAttribute('stroke', COL.line); gl.setAttribute('stroke-width', 1);
+      svg.appendChild(gl);
+      var t = elSvg('text'); t.textContent = fmt(v); t.setAttribute('x', padL - 6); t.setAttribute('y', yy + 4);
+      t.setAttribute('text-anchor', 'end'); t.setAttribute('font-size', 10); t.setAttribute('fill', COL.muted);
+      svg.appendChild(t);
+    });
+
+    // X 轴学历标签：每层都标（并列层也各有各的点，不能漏标）
+    // 同一 tier 的连着标一条细下划线，把「并列」这个位次概念画出来
+    var runs = [];
+    xs.forEach(function (x) {
+      var last = runs[runs.length - 1];
+      if (last && last.tier === x.tier) last.items.push(x);
+      else runs.push({ tier: x.tier, items: [x] });
+    });
+    runs.forEach(function (run) {
+      run.items.forEach(function (x) {
+        var t = elSvg('text'); t.textContent = x.name;
+        t.setAttribute('x', xAt(x.i)); t.setAttribute('y', H - padB + 16);
+        t.setAttribute('text-anchor', 'middle'); t.setAttribute('font-size', 10.5);
+        t.setAttribute('fill', COL.ink2);
+        svg.appendChild(t);
+      });
+      if (run.items.length > 1) {
+        var a = xAt(run.items[0].i), b = xAt(run.items[run.items.length - 1].i);
+        var half = Math.max(16, (b - a) / 2 + 6);
+        var br = elSvg('line');
+        br.setAttribute('x1', a - half); br.setAttribute('x2', b + half);
+        br.setAttribute('y1', H - padB + 22); br.setAttribute('y2', H - padB + 22);
+        br.setAttribute('stroke', COL.line); br.setAttribute('stroke-width', 2);
+        br.setAttribute('stroke-linecap', 'round');
+        svg.appendChild(br);
+      }
+    });
+
+    // name -> x 轴位置
+    var idxByName = {};
+    xs.forEach(function (x) { idxByName[x.name] = x.i; });
+
+    // 每个岗位画曲线：色相 = 岗位，实线 = 挤压，虚线 = 替代
+    all.forEach(function (r, ji) {
+      var isExam = r.job.type === 'exam';
+      var jobColor = JOB_COLORS[ji % JOB_COLORS.length];
+
+      // 挤压阻力（实线）
+      drawCurve(svg, r.rows.map(function (row) {
+        return { x: xAt(idxByName[row.name]), y: yAt(row.pressure) };
+      }), jobColor, false);
+
+      // 替代压力（虚线）
+      drawCurve(svg, r.rows.map(function (row) {
+        return { x: xAt(idxByName[row.name]), y: yAt(row.substitution) };
+      }), jobColor, true);
+
+      // 图例：小线段和图上样式一致，色 + 线型都对得上
+      var ln = el('span');
+      ln.appendChild(swatch(jobColor, false));
+      ln.appendChild(document.createTextNode(r.job.name + '·挤压'));
+      ln.appendChild(swatch(jobColor, true));
+      ln.appendChild(document.createTextNode(r.job.name + '·替代' + (isExam ? '（=挤压）' : '')));
+      legend.appendChild(ln);
+    });
+  }
+
+  // 图例里的小线段，画法和曲线一致，避免图例与图上样式对不上
+  function swatch(color, dashed) {
+    var s = elSvg('svg');
+    s.setAttribute('width', 18); s.setAttribute('height', 10);
+    s.style.marginRight = '5px'; s.style.verticalAlign = '-1px';
+    var l = elSvg('line');
+    l.setAttribute('x1', 1); l.setAttribute('x2', 17);
+    l.setAttribute('y1', 5); l.setAttribute('y2', 5);
+    l.setAttribute('stroke', color); l.setAttribute('stroke-width', 2.5);
+    l.setAttribute('stroke-linecap', 'round');
+    if (dashed) l.setAttribute('stroke-dasharray', '4 3');
+    s.appendChild(l);
+    return s;
+  }
+
+  /**
+   * 单调三次插值（Fritsch–Carlson）→ SVG path 的 d 串。
+   * 为什么不用常见的 Catmull-Rom：数据里到处是「上升后走平」（比如顶端两层压力都是 0），
+   * Catmull-Rom 在这种拐角会过冲，把曲线甩到 0 以下画出负值。单调版保证段内不越界。
+   */
+  function smoothPath(pts) {
+    var n = pts.length;
+    if (n === 0) return '';
+    if (n === 1) return 'M' + pts[0].x.toFixed(1) + ',' + pts[0].y.toFixed(1);
+
+    var h = [], delta = [];
+    for (var i = 0; i < n - 1; i++) {
+      var dx = pts[i + 1].x - pts[i].x;
+      h.push(dx);
+      delta.push(dx === 0 ? 0 : (pts[i + 1].y - pts[i].y) / dx);
+    }
+
+    // 初始切线：取相邻割线的平均；端点直接沿用最近一段
+    var m = new Array(n);
+    m[0] = delta[0];
+    m[n - 1] = delta[n - 2];
+    for (var i = 1; i < n - 1; i++) m[i] = (delta[i - 1] + delta[i]) / 2;
+
+    // Fritsch–Carlson 修正：削掉会产生过冲的切线
+    for (var i = 0; i < n - 1; i++) {
+      if (delta[i] === 0) { m[i] = 0; m[i + 1] = 0; continue; }
+      var a = m[i] / delta[i], b = m[i + 1] / delta[i];
+      var s = a * a + b * b;
+      if (s > 9) {
+        var tau = 3 / Math.sqrt(s);
+        m[i] = tau * a * delta[i];
+        m[i + 1] = tau * b * delta[i];
+      }
+    }
+
+    // Hermite → 三次贝塞尔
+    var d = 'M' + pts[0].x.toFixed(1) + ',' + pts[0].y.toFixed(1);
+    for (var i = 0; i < n - 1; i++) {
+      var hh = h[i] / 3;
+      var c1x = pts[i].x + hh, c1y = pts[i].y + m[i] * hh;
+      var c2x = pts[i + 1].x - hh, c2y = pts[i + 1].y - m[i + 1] * hh;
+      d += ' C' + c1x.toFixed(1) + ',' + c1y.toFixed(1)
+         + ' ' + c2x.toFixed(1) + ',' + c2y.toFixed(1)
+         + ' ' + pts[i + 1].x.toFixed(1) + ',' + pts[i + 1].y.toFixed(1);
+    }
+    return d;
+  }
+
+  function drawCurve(svg, pts, color, dashed) {
+    if (!pts.length) return;
+    var path = elSvg('path');
+    path.setAttribute('d', smoothPath(pts));
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', color);
+    path.setAttribute('stroke-width', 2);
+    path.setAttribute('stroke-linejoin', 'round');
+    path.setAttribute('stroke-linecap', 'round');
+    if (dashed) path.setAttribute('stroke-dasharray', '6 4');
+    svg.appendChild(path);
+    // 数据点仍照原值画实心圆，保证读数不被平滑带偏
+    pts.forEach(function (p) {
+      var c = elSvg('circle');
+      c.setAttribute('cx', p.x); c.setAttribute('cy', p.y); c.setAttribute('r', 3.5);
+      c.setAttribute('fill', color);
+      svg.appendChild(c);
+    });
+  }
+  // 1-2-5 刻度序列里「不超过 v 的最大那个」—— 对数轴取上下界用，保证轴端本身也是刻度
+  function tickFloor(v) {
+    if (!(v > 0)) return 0.5;
+    var p = 1;
+    while (p * 10 <= v) p *= 10;   // 先把 p 推到 v 的量级
+    while (p > v) p /= 10;
+    if (5 * p <= v) return 5 * p;
+    if (2 * p <= v) return 2 * p;
+    return p;
+  }
+
+  // 刻度文字：整万就写「1万」，不是整万才带一位小数（对数轴的 1-2-5 全是整数倍）
+  function fmt(v) {
+    if (v >= 10000) {
+      var w = v / 10000;
+      return (Math.abs(w - Math.round(w)) < 1e-9 ? Math.round(w) : w.toFixed(1)) + '万';
+    }
+    return String(Math.round(v));
+  }
+
+  // ---------- 汇总 ----------
+  function renderLegend() { renderChart(); }
+  function renderAll() { renderSequence(); renderJobs(); renderChart(); }
+
+  renderAll();
+})();
+</script>
+</body>
+</html>
