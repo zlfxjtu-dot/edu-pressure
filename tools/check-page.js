@@ -78,6 +78,12 @@ console.log('曲线数据点 circle:', count('circle'), '(本科岗 5 层 + 硕�
 console.log('Y 轴网格 line:', count('line'), '(对数轴 9 条 1-2-5 刻度 + 1 条并列下划线 = 10)');
 
 const pyr = registry['pyramid'];
-const pcount = (tag) => (pyr ? pyr.children.filter(c => c.tagName === tag).length : 0);
-console.log('金字塔 rect:', pcount('rect'), '(应 8 = 序列层数)');
+const pkids = pyr ? pyr.children : [];
+const pcount = (tag) => pkids.filter(c => c.tagName === tag).length;
+const bands = pkids.filter(c => c.tagName === 'rect' && c.attributes.opacity);
+const pedges = pkids.filter(c => c.tagName === 'line' && c.attributes.opacity);
+console.log('金字塔 rect:', pcount('rect'), '(8 柱 + 2 岗位区间带 = 10)');
+console.log('金字塔 区间上下线 line:', pedges.length, '(2 岗位 × 上下两条 = 4)');
 console.log('金字塔 viewBox:', pyr ? pyr.attributes.viewBox : 'N/A');
+const pleg = registry['pyramidLegend'];
+console.log('金字塔图例条目:', pleg ? pleg.children.length : 'N/A', '(应 2 = 岗位数)');

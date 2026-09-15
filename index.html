@@ -110,9 +110,10 @@
 
       <h2 style="margin-top:18px">人数金字塔</h2>
       <div class="hint">
-        按位次自下而上排。柱长 = 该层人数（就是上面你填的原始输入，和岗位无关）。<br>
-        整体是金字塔形，但<b>不保证单调收窄</b>——默认数据在硕士段就有个凸起：本科毕业去读研，人堆在那一档。
+        按位次自下而上排，柱长 = 该层人数。<br>
+        淡色带 = 岗位区间覆盖到的学历，带的两端就是该岗位的<b>上下线</b>——落在哪两层之间，一眼能看出来。
       </div>
+      <div class="legend" id="pyramidLegend"></div>
       <svg id="pyramid" viewBox="0 0 382 200"></svg>
     </section>
 
@@ -284,7 +285,7 @@
       var r1 = el('div', 'row');
       r1.appendChild(el('label', null, '岗位'));
       var nm = el('input', 'nm'); nm.type = 'text'; nm.value = job.name;
-      nm.oninput = function () { job.name = nm.value; renderLegend(); };
+      nm.oninput = function () { job.name = nm.value; renderOutputs(); };
       var del = el('button', 'del-job', '删除');
       del.onclick = function () { state.jobs.splice(i, 1); renderJobs(); renderAll(); };
       r1.appendChild(nm);
@@ -294,16 +295,16 @@
         if (job.type === t[0]) o.selected = true;
         type.appendChild(o);
       });
-      type.onchange = function () { job.type = type.value; renderChart(); };
+      type.onchange = function () { job.type = type.value; renderOutputs(); };
       r1.appendChild(type); r1.appendChild(del);
 
       var r2 = el('div', 'row');
       r2.appendChild(el('label', null, '区间'));
       var lower = mkSelect(names, job.lower);
-      lower.onchange = function () { job.lower = lower.value; renderChart(); };
+      lower.onchange = function () { job.lower = lower.value; renderOutputs(); };
       r2.appendChild(el('span', null, '~'));
       var upper = mkSelect(names, job.upper);
-      upper.onchange = function () { job.upper = upper.value; renderChart(); };
+      upper.onchange = function () { job.upper = upper.value; renderOutputs(); };
       r2.appendChild(lower); r2.appendChild(upper);
 
       card.appendChild(r1); card.appendChild(r2);
@@ -343,11 +344,13 @@
   };
 
   // ---------- 渲染：曲线 ----------
+  // 岗位配色：色相编码「哪个岗位」，实线 / 虚线编码「挤压 / 替代」。
+  // 旧方案用颜色编码压力类型，结果两个岗位的挤压都是橙、替代都是蓝，四根线挤在两种颜色里分不开。
+  // 放在模块作用域：右栏曲线和左栏金字塔的岗位区间带共用这一套，颜色才对得上。
+  var JOB_COLORS = ['#eb6834', '#2a78d6', '#2f8f5b', '#8a5cd6', '#c2418f', '#a1740f'];
+
   function renderChart() {
     var COL = { pressure: '#eb6834', substitution: '#2a78d6', line: '#e1e0d9', muted: '#898781', ink2: '#52514e' };
-    // 岗位配色：色相编码「哪个岗位」，实线 / 虚线编码「挤压 / 替代」。
-    // 旧方案用颜色编码压力类型，结果两个岗位的挤压都是橙、替代都是蓝，四根线挤在两种颜色里分不开。
-    var JOB_COLORS = ['#eb6834', '#2a78d6', '#2f8f5b', '#8a5cd6', '#c2418f', '#a1740f'];
     var svg = byId('chart');
     var legend = byId('legend');
     svg.innerHTML = ''; legend.innerHTML = '';
@@ -593,8 +596,10 @@
   // 往上逐层收窄。这个形状本身就是真实结构 —— 学历越高，人越少。
   function renderPyramid() {
     var svg = byId('pyramid');
+    var leg = byId('pyramidLegend');
     if (!svg) return;
     svg.innerHTML = '';
+    if (leg) leg.innerHTML = '';
     var seq = flatSequence();                 // 顺序 = tier 从低到高
     if (!seq.length) return;
 
@@ -608,6 +613,28 @@
     var full = niceMax(max);                  // 刻度上限，取 1/2/5×10^n
 
     function xAt(v) { return padL + v / full * plotW; }
+    // seq 下标 i ↔ 屏幕行：i = 0（位次最低）落在最下面一行
+    function rowY(i) { return padT + (seq.length - 1 - i) * rowH; }
+
+    // ---- 岗位区间带 ----
+    // 每个岗位在自己覆盖的那几行上铺一条淡色带，带的上下两端再各画一条实线。
+    // 那两条线就是岗位区间的**上/下线** —— 落在哪两层之间，一眼能看出来。
+    var idxOf = {};
+    seq.forEach(function (l, i) { idxOf[l.name] = i; });
+    var bands = [];
+    state.jobs.forEach(function (job, ji) {
+      var a = idxOf[job.lower], b = idxOf[job.upper];
+      if (a == null || b == null) return;            // 端点不在序列里
+      var lo = Math.min(a, b), hi = Math.max(a, b);
+      var color = JOB_COLORS[ji % JOB_COLORS.length];
+      var yTop = rowY(hi), yBot = rowY(lo) + rowH;
+      var band = elSvg('rect');
+      band.setAttribute('x', 0); band.setAttribute('y', yTop);
+      band.setAttribute('width', W); band.setAttribute('height', yBot - yTop);
+      band.setAttribute('fill', color); band.setAttribute('opacity', '0.10');
+      svg.appendChild(band);
+      bands.push({ color: color, yTop: yTop, yBot: yBot });
+    });
 
     // 竖网格 + 底部刻度：1-2-5 取值，标签才是整数
     var ticks = [0];
@@ -657,6 +684,29 @@
       cv.setAttribute('font-size', 9.5); cv.setAttribute('fill', '#898781');
       svg.appendChild(cv);
     });
+
+    // 区间上下线画在柱子**之上**，否则会被柱子盖住。
+    // 线的位置在行的上/下边缘，而名字和人数标在行中央，所以不会压到文字。
+    bands.forEach(function (b) {
+      [b.yTop, b.yBot].forEach(function (yy) {
+        var ln = elSvg('line');
+        ln.setAttribute('x1', 0); ln.setAttribute('x2', W);
+        ln.setAttribute('y1', yy); ln.setAttribute('y2', yy);
+        ln.setAttribute('stroke', b.color); ln.setAttribute('stroke-width', 1.5);
+        ln.setAttribute('opacity', '0.85');
+        svg.appendChild(ln);
+      });
+    });
+
+    // 图例：色 ⇄ 岗位，和右栏曲线共用同一套配色，两边颜色对得上
+    if (leg) {
+      state.jobs.forEach(function (job, ji) {
+        var ln = el('span');
+        ln.appendChild(swatch(JOB_COLORS[ji % JOB_COLORS.length], false));
+        ln.appendChild(document.createTextNode(job.name + '：' + job.lower + ' ~ ' + job.upper));
+        leg.appendChild(ln);
+      });
+    }
   }
 
   // 刻度上限：不小于 v 的最小 1/2/5×10^n
@@ -672,9 +722,9 @@
   }
 
   // ---------- 汇总 ----------
-  // 人数金字塔不依赖岗位和参数，只有层数/人数变了才需要重画
+  // 金字塔现在跟着岗位走（画区间带），所以两边一起重画。
+  // 只有渗透/基准/纵轴刻度这三个参数不用重画金字塔。
   function renderOutputs() { renderChart(); renderPyramid(); }
-  function renderLegend() { renderChart(); }
   function renderAll() { renderSequence(); renderJobs(); renderOutputs(); }
 
   renderAll();

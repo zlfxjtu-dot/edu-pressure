@@ -92,11 +92,22 @@ if (pyr) {
   out.push('===== 人数金字塔 =====');
   out.push(`viewBox=${pyr.attributes.viewBox}`);
   const kids = pyr.children;
-  out.push(`rect=${kids.filter(c => c.tagName === 'rect').length}  line=${kids.filter(c => c.tagName === 'line').length}  text=${kids.filter(c => c.tagName === 'text').length}`);
-  const rects = kids.filter(c => c.tagName === 'rect');
+  const allRects = kids.filter(c => c.tagName === 'rect');
+  const bands = allRects.filter(r => r.attributes.opacity);        // 岗位区间带
+  const bars = allRects.filter(r => !r.attributes.opacity);        // 人数柱
+  const allLines = kids.filter(c => c.tagName === 'line');
+  const grid = allLines.filter(l => !l.attributes.opacity);        // 竖网格
+  const edges = allLines.filter(l => l.attributes.opacity);        // 区间上下线
   const txts = kids.filter(c => c.tagName === 'text');
+  out.push(`柱=${bars.length}  区间带=${bands.length}  网格=${grid.length}  上下线=${edges.length}  text=${txts.length}`);
+  out.push('');
+  out.push('--- 岗位区间带（覆盖哪几行）---');
+  bands.forEach(b => out.push(`  fill=${b.attributes.fill}  y=${parseFloat(b.attributes.y).toFixed(1)} ~ ${(parseFloat(b.attributes.y) + parseFloat(b.attributes.height)).toFixed(1)}`));
+  out.push('--- 区间上下线 ---');
+  edges.forEach(l => out.push(`  stroke=${l.attributes.stroke}  y=${parseFloat(l.attributes.y1).toFixed(1)}`));
+  out.push('');
   out.push('--- 柱（绘制顺序 = 从上往下）---');
-  rects.forEach((r, i) => {
+  bars.forEach((r, i) => {
     const mid = parseFloat(r.attributes.y) + parseFloat(r.attributes.height) / 2 + 3.5;
     const row = txts.filter(t => Math.abs(parseFloat(t.attributes.y) - mid) < 1.2)
       .map(t => (t.attributes['text-anchor'] === 'end' ? '名=' : '值=') + t.textContent);
