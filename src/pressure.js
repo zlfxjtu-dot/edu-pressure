@@ -6,7 +6,8 @@
  *
  * 两种岗位类型：
  *   - normal 普通岗：压力 = 区间内、位次更高的学历人数；替代 = 位次更低的学历人数（上下不对称，同层不算）
- *   - exam   考试岗：只看分数和门槛，过了门槛学历高低不起作用 → 压力 = 替代 = 区间内其他所有人（对称）
+ *   - exam   考试岗：只看分数和门槛，过了门槛学历高低不起作用 → 压力 = 替代 = 区间内**总人数（含本层）**。
+ *             它描述的是「池子规模」，与是哪一层无关，所以区间内每层取值相同 —— 一条水平线。
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
@@ -81,6 +82,16 @@
       return d === 0 ? 1 : Math.pow(k, d);
     }
 
+    // 考试岗：只看分数和门槛，过了门槛学历高低不起作用 ——
+    // 区间内每一层面对的都是**同一个池子**，所以压力 = 区间内总人数（含本层）＋渗透＋基准。
+    // 它与「是哪一层」无关，所有层取值相同 —— 画出来是一条**水平线**。
+    // 注意这里**不排除本层**：压力描述的是池子规模，你自己也在池子里。
+    var examPool = 0;
+    if (isExam) {
+      examPool = base;
+      sequence.forEach(function (ol) { examPool += ol.count * weight(ol.tier); });
+    }
+
     var out = [];
 
     for (var i = 0; i < inRange.length; i++) {
@@ -88,26 +99,22 @@
       var pressure = 0;
       var substitution = 0;
 
-      // 遍历整条序列，不再只遍历区间内 —— 区间外的人也会来投
-      for (var j = 0; j < sequence.length; j++) {
-        var ol = sequence[j];
-        if (ol.name === l.name) continue;
-        if (!isExam && ol.tier === l.tier) continue; // 普通岗：同 tier 并列，既不算挤也不算替
+      if (isExam) {
+        pressure = substitution = examPool;
+      } else {
+        // 遍历整条序列，不再只遍历区间内 —— 区间外的人也会来投
+        for (var j = 0; j < sequence.length; j++) {
+          var ol = sequence[j];
+          if (ol.name === l.name) continue;
+          if (ol.tier === l.tier) continue;   // 同 tier 并列，既不算挤也不算替
 
-        var w = weight(ol.tier);
-        if (isExam) {
-          // 考试岗：只看分数和门槛，上下对称
-          pressure += ol.count * w;
-          substitution += ol.count * w;
-        } else if (ol.tier > l.tier) {
-          pressure += ol.count * w;       // 上方往下挤
-        } else {
-          substitution += ol.count * w;   // 下方往上顶
+          var w = weight(ol.tier);
+          if (ol.tier > l.tier) pressure += ol.count * w;   // 上方往下挤
+          else substitution += ol.count * w;                // 下方往上顶
         }
+        pressure += base;
+        substitution += base;
       }
-
-      pressure += base;
-      substitution += base;
 
       out.push({
         name: l.name,

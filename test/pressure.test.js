@@ -64,17 +64,29 @@ test('普通岗：同 tier（并列）不算压力也不算替代', () => {
   assert.strictEqual(b.pressure, 0);
 });
 
-test('考试岗：压力 = 替代（对称），值 = 区间内其他所有人', () => {
+test('考试岗：区间内每层压力相同，= 区间内总人数（含本层）', () => {
   const rows = M.solve(SEQ, job('二本', '双九硕', 'exam'), PURE);
   for (const r of rows) {
     assert.strictEqual(r.pressure, r.substitution, `${r.name} 应压力=替代`);
-    assert.strictEqual(r.pressure, TOTAL - r.count, `${r.name} 应等于其他人总和`);
+    // 不排除本层：压力描述的是池子规模，你自己也在池子里
+    assert.strictEqual(r.pressure, TOTAL, `${r.name} 应等于区间内总人数`);
   }
 });
 
-test('考试岗：并列的两层彼此也算「其他人」', () => {
-  const rows = M.solve(SEQ, job('二本', '双九硕', 'exam'), PURE);
-  assert.strictEqual(byName(rows, '985硕').pressure, TOTAL - CNT['985硕']); // 含双九硕
+test('考试岗：只看分数，层与层之间没有差别（一条水平线）', () => {
+  const rows = M.solve(SEQ, job('双非硕', '双九硕', 'exam'), PURE);
+  const vals = rows.map(r => r.pressure);
+  assert.strictEqual(new Set(vals).size, 1, `压力应处处相同，实得 ${vals.join(',')}`);
+  assert.strictEqual(vals[0],
+    CNT['双非硕'] + CNT['985本'] + CNT['211硕'] + CNT['985硕'] + CNT['双九硕']);
+});
+
+test('考试岗：渗透和基准照样计入池子', () => {
+  const rows = M.solve(SEQ, job('双非硕', '双九硕', 'exam'), { spillover: K, baseline: BASE });
+  const inRange = CNT['双非硕'] + CNT['985本'] + CNT['211硕'] + CNT['985硕'] + CNT['双九硕'];
+  // 区间外：211本 隔 1 档 → k，双非 隔 2 档 → k²，二本 隔 3 档 → k³
+  const outRange = CNT['211本'] * Math.pow(K, 1) + CNT['双非'] * Math.pow(K, 2) + CNT['二本'] * Math.pow(K, 3);
+  for (const r of rows) near(r.pressure, inRange + outRange + BASE, `${r.name} 池子`);
 });
 
 test('区间端点不在序列里 → 空结果', () => {
