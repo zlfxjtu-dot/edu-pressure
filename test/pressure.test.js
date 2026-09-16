@@ -43,25 +43,35 @@ test('默认岗位：本科岗与硕士岗，区间在 双非硕/985本 处重�
 
 // ---------- 区间内语义（关掉渗透和基准）----------
 
-test('普通岗：区间最低层替代为 0，压力 = 上方全部', () => {
+test('普通岗：区间最低层替代为 0，压力 = 同级及上方全部', () => {
   const r = byName(M.solve(SEQ, job('985本', '双九硕'), PURE), '985本');
   assert.strictEqual(r.substitution, 0);                                    // 区间内下方没人
-  assert.strictEqual(r.pressure, CNT['211硕'] + CNT['985硕'] + CNT['双九硕']);
+  // 含本层自己 —— 同层的人学历等价，投的是同一批岗
+  assert.strictEqual(r.pressure, CNT['985本'] + CNT['211硕'] + CNT['985硕'] + CNT['双九硕']);
 });
 
-test('普通岗：顶端压力为 0，替代 = 下方全部', () => {
+test('普通岗：顶端替代 = 下方全部，压力只剩同级那几层', () => {
   const r = byName(M.solve(SEQ, job('985本', '双九硕'), PURE), '双九硕');
-  assert.strictEqual(r.pressure, 0);                                        // 区间内上方没人
   assert.strictEqual(r.substitution, CNT['985本'] + CNT['211硕']);
+  assert.strictEqual(r.pressure, CNT['985硕'] + CNT['双九硕']);   // 同级的 985硕 + 自己
 });
 
-test('普通岗：同 tier（并列）不算压力也不算替代', () => {
+test('普通岗：同层（含本层）计入压力', () => {
+  // 二本独占一层：压力 = 自己 + 位次比它高的全部
+  const r = byName(M.solve(SEQ, job('二本', '985本'), PURE), '二本');
+  assert.strictEqual(r.pressure,
+    CNT['二本'] + CNT['双非'] + CNT['211本'] + CNT['双非硕'] + CNT['985本']);
+});
+
+test('普通岗：并列的两层互相算压力，取值相同（谁也不少算一个）', () => {
   const rows = M.solve(SEQ, job('985本', '双九硕'), PURE);
   const a = byName(rows, '985硕'), b = byName(rows, '双九硕');
-  assert.strictEqual(a.substitution, CNT['985本'] + CNT['211硕']);   // 不含同层的双九硕
-  assert.strictEqual(a.pressure, 0);
-  assert.strictEqual(b.substitution, CNT['985本'] + CNT['211硕']);   // 不含同层的 985硕
-  assert.strictEqual(b.pressure, 0);
+  const sameTier = CNT['985硕'] + CNT['双九硕'];
+  assert.strictEqual(a.pressure, sameTier);
+  assert.strictEqual(b.pressure, sameTier);
+  assert.strictEqual(a.substitution, CNT['985本'] + CNT['211硕']);   // 下方与同级无关
+  assert.strictEqual(b.substitution, CNT['985本'] + CNT['211硕']);
+  assert.strictEqual(a.pressure % 1000, 0, '不扣自己那一个，不该出现 999 结尾');
 });
 
 test('考试岗：区间内每层压力相同，= 区间内总人数（含本层）', () => {
@@ -96,7 +106,8 @@ test('区间端点不在序列里 → 空结果', () => {
 
 test('倍数 = 人数 ÷ 本层人数，人数为 0 时倍数为 null', () => {
   const r = byName(M.solve(SEQ, job('985本', '双九硕'), PURE), '985本');
-  assert.strictEqual(r.pressureRatio, (CNT['211硕'] + CNT['985硕'] + CNT['双九硕']) / CNT['985本']);
+  assert.strictEqual(r.pressureRatio,
+    (CNT['985本'] + CNT['211硕'] + CNT['985硕'] + CNT['双九硕']) / CNT['985本']);
   assert.strictEqual(r.substitutionRatio, 0);
 
   const zero = [{ name: '空层', count: 0, tier: 0 }, { name: '二本', count: 100, tier: 1 }];
@@ -115,10 +126,11 @@ test('渗透：硕士岗底层（双非硕）的替代不再为 0，来自区间
   assert.ok(r.substitution > 0);
 });
 
-test('渗透：本科岗顶层（985本）的挤压不再为 0，来自区间外的 211硕/985硕/双九硕', () => {
+test('渗透：本科岗顶层（985本）的挤压 = 自己 + 区间外的 211硕/985硕/双九硕', () => {
   const r = byName(M.solve(SEQ, job('二本', '985本'), { spillover: K, baseline: 0 }), '985本');
   near(r.pressure,
-    CNT['211硕'] * Math.pow(K, 1) + CNT['985硕'] * Math.pow(K, 2) + CNT['双九硕'] * Math.pow(K, 2),
+    CNT['985本']
+      + CNT['211硕'] * Math.pow(K, 1) + CNT['985硕'] * Math.pow(K, 2) + CNT['双九硕'] * Math.pow(K, 2),
     '985本 挤压');
   assert.ok(r.pressure > 0);
 });
@@ -140,14 +152,11 @@ test('渗透率为 0 时退回原语义', () => {
 
 // ---------- 基准竞争 ----------
 
-test('基准：序列两端也不会归零（本科岗底 = 二本，硕士岗顶 = 双九硕）', () => {
+test('基准：替代侧的最低层仍靠基准兜底（二本下方确实无人）', () => {
+  // 换口径后压力侧不再需要兜底了（同层+自己总有值），但替代侧的下界仍然会归零
   const 本 = byName(M.solve(SEQ, job('二本', '985本')), '二本');
   assert.strictEqual(本.substitution, BASE, '二本 下方确实无人，只剩基准');
   assert.ok(本.substitution > 0);
-
-  const 硕 = byName(M.solve(SEQ, job('双非硕', '双九硕')), '双九硕');
-  assert.strictEqual(硕.pressure, BASE, '双九硕 上方确实无人，只剩基准');
-  assert.ok(硕.pressure > 0);
 });
 
 test('基准：每层都垫，且与渗透叠加', () => {

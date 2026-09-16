@@ -5,7 +5,8 @@
  * 输出：区间内每层学历的「挤压阻力」（上方往下挤）与「替代压力」（下方往上顶）。
  *
  * 两种岗位类型：
- *   - normal 普通岗：压力 = 区间内、位次更高的学历人数；替代 = 位次更低的学历人数（上下不对称，同层不算）
+ *   - normal 普通岗：压力 = 位次**同级或更高**的学历人数（含本层自己）；替代 = 位次更低的学历人数。
+ *             上下不对称。同层算压力 —— 同层的人学历等价，投的是同一批岗，是直接竞争对手。
  *   - exam   考试岗：只看分数和门槛，过了门槛学历高低不起作用 → 压力 = 替代 = 区间内**总人数（含本层）**。
  *             它描述的是「池子规模」，与是哪一层无关，所以区间内每层取值相同 —— 一条水平线。
  */
@@ -105,12 +106,12 @@
         // 遍历整条序列，不再只遍历区间内 —— 区间外的人也会来投
         for (var j = 0; j < sequence.length; j++) {
           var ol = sequence[j];
-          if (ol.name === l.name) continue;
-          if (ol.tier === l.tier) continue;   // 同 tier 并列，既不算挤也不算替
-
           var w = weight(ol.tier);
-          if (ol.tier > l.tier) pressure += ol.count * w;   // 上方往下挤
-          else substitution += ol.count * w;                // 下方往上顶
+          // 判据是**位次**，不是名字：同层（并列）和上方一样算压力 ——
+          // 同层的人学历跟你等价，投的是同一批岗，是直接竞争对手。
+          // 本层自己也一并算进去，不单独扣掉那一个：扣了满屏都是 999 结尾。
+          if (ol.tier >= l.tier) pressure += ol.count * w;   // 同级 + 上方往下挤
+          else substitution += ol.count * w;                 // 下方往上顶
         }
         pressure += base;
         substitution += base;
