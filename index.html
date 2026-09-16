@@ -63,6 +63,11 @@
   .chip .del { cursor: pointer; color: var(--muted); font-size: 14px; border: none; background: none; padding: 0 2px; }
   .chip .del:hover { color: var(--pressure); }
   .tier-tag { flex: 0 0 auto; font-size: 10.5px; color: var(--muted); writing-mode: vertical-rl; text-align: center; }
+  /* 行与行之间的插入槽：拖到这里 = 把这层抽出来单独成一行（拆并列）。
+     平时只有 6px 不占地方，一开始拖就撑到 18px —— 否则那么窄根本点不中。 */
+  .dropgap { height: 6px; border-radius: 6px; transition: height .12s; }
+  #sequence.dragging .dropgap { height: 18px; }
+  .dropgap.over { background: var(--substitution); opacity: 0.25; }
   .btn { margin-top: 10px; font-size: 12.5px; padding: 6px 12px; border: 1px solid var(--line);
     background: var(--surface); color: var(--ink); border-radius: 8px; cursor: pointer; }
   .btn:hover { background: var(--line); }
@@ -115,7 +120,7 @@
       <h2><input id="dimLabel" class="dim" type="text" value="学历" maxlength="10"
         title="这一列装什么：学历 / 专业 / 任意人群。改了这里，标题、提示、人数框的说明都跟着变"
       >序列</h2>
-      <div class="hint" id="seqHint">拖学历到某一行 = 换位次 / 并列；↑↓ 调整行的顺序</div>
+      <div class="hint" id="seqHint">拖学历到某一行 = 换位次 / 并列；拖到行与行之间的缝 = 抽出来单独一行；↑↓ 调整行的顺序</div>
       <div id="sequence"></div>
       <button class="btn" id="addLayer">＋ 加学历</button>
 
@@ -209,7 +214,8 @@
   function renderDim() {
     var d = state.dim;
     byId('seqHint').textContent =
-      '拖' + d + '到某一行 = 换位次 / 并列；↑↓ 调整行的顺序；每格填该' + d + '的人数';
+      '拖' + d + '到某一行 = 换位次 / 并列；拖到行与行之间的缝 = 抽出来单独一行；' +
+      '↑↓ 调整行的顺序；每格填该' + d + '的人数';
     countInputs.forEach(function (i) { i.title = d + '人数'; });
   }
   byId('dimLabel').oninput = function () {
@@ -220,8 +226,10 @@
   function renderSequence() {
     var box = byId('sequence');
     box.innerHTML = '';
+    box.classList.remove('dragging');        // 拖完重绘，别让插入槽还撑着
     countInputs.length = 0;
     state.groups.forEach(function (g, tier) {
+      box.appendChild(mkDropGap(tier));      // 这一行上面的插入槽
       var grp = el('div', 'group');
       grp.dataset.tier = tier;
       grp._group = g;
@@ -254,8 +262,12 @@
         chip.addEventListener('dragstart', function () {
           drag = { name: l.name, fromTier: tier };
           chip.classList.add('dragging');
+          box.classList.add('dragging');       // 撑开插入槽，否则 6px 太难点中
         });
-        chip.addEventListener('dragend', function () { chip.classList.remove('dragging'); });
+        chip.addEventListener('dragend', function () {
+          chip.classList.remove('dragging');
+          box.classList.remove('dragging');
+        });
         layers.appendChild(chip);
       });
 
@@ -273,6 +285,7 @@
       grp.appendChild(mv); grp.appendChild(layers); grp.appendChild(tag);
       box.appendChild(grp);
     });
+    box.appendChild(mkDropGap(state.groups.length));   // 末尾也留一个，才能拖到最后
   }
 
   function moveGroup(tier, delta) {
@@ -293,6 +306,41 @@
     if (!layer) return;
     state.groups = state.groups.filter(function (g) { return g.layers.length; });
     targetGroup.layers.push(layer);
+    renderAll();
+  }
+
+  // 行与行之间的插入槽。拖到这里 = 把这层从原来那行抽出来，单独成一行。
+  // 「并进去」有 moveLayerTo，但「拆出来」原来根本没有路径 —— 合了就再也分不开。
+  function mkDropGap(beforeIdx) {
+    var gap = el('div', 'dropgap');
+    gap.title = '拖到这里 = 抽出来单独一行';
+    gap.addEventListener('dragover', function (ev) { ev.preventDefault(); gap.classList.add('over'); });
+    gap.addEventListener('dragleave', function () { gap.classList.remove('over'); });
+    gap.addEventListener('drop', function (ev) {
+      ev.preventDefault(); gap.classList.remove('over');
+      if (!drag) return;
+      extractToNewGroup(drag.name, beforeIdx);
+      drag = null;
+    });
+    return gap;
+  }
+
+  // 把 name 从它所在的行抽出来单独成一行，插到「原本第 beforeIdx 行」的位置
+  function extractToNewGroup(name, beforeIdx) {
+    var layer = null, srcTier = -1;
+    state.groups.forEach(function (g, t) {
+      g.layers = g.layers.filter(function (l) {
+        if (l.name === name) { layer = l; srcTier = t; return false; }
+        return true;
+      });
+    });
+    if (!layer) return;
+    // 原来那行被抽空了就先删掉，否则会留一个空行
+    var emptied = state.groups[srcTier].layers.length === 0;
+    if (emptied) state.groups.splice(srcTier, 1);
+    // beforeIdx 是相对**抽之前**的行号；被删的行若在它前面，整体前移一位
+    var at = beforeIdx - (emptied && srcTier < beforeIdx ? 1 : 0);
+    state.groups.splice(Math.max(0, Math.min(at, state.groups.length)), 0, { layers: [layer] });
     renderAll();
   }
 
