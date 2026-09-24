@@ -28,7 +28,22 @@
     font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; }
   .app { max-width: 1180px; margin: 0 auto; }
   h1 { font-size: 20px; margin: 0 0 4px; font-weight: 650; }
-  .sub { font-size: 13px; color: var(--ink2); margin: 0 0 20px; line-height: 1.5; }
+  .sub { font-size: 13.5px; color: var(--ink2); margin: 0 0 12px; line-height: 1.6; }
+  /* 使用说明分两层：上面三步是「怎么用」，一眼看得完；
+     术语和口径收进 <details>，第一次打开的人不会被术语墙劝退。 */
+  .steps { font-size: 13px; color: var(--ink2); margin: 0 0 14px; padding-left: 22px; line-height: 1.75; }
+  .steps li { margin-bottom: 3px; }
+  .steps b { color: var(--ink); }
+  .more { font-size: 12.5px; color: var(--ink2); margin: 0 0 20px; }
+  .more summary { cursor: pointer; color: var(--muted); width: fit-content; }
+  .more summary:hover { color: var(--ink2); }
+  .more > div { margin-top: 9px; padding: 2px 0 2px 14px; border-left: 2px solid var(--line); line-height: 1.65; }
+  .more h3 { font-size: 12.5px; margin: 12px 0 3px; font-weight: 650; color: var(--ink); }
+  .more h3:first-child { margin-top: 0; }
+  .more p { margin: 0; }
+  .more ul { margin: 0; padding-left: 18px; }
+  .more li { margin-bottom: 3px; }
+  .more b { color: var(--ink); }
   .main { display: grid; grid-template-columns: 420px 1fr; gap: 20px; align-items: start; }
   @media (max-width: 900px) { .main { grid-template-columns: 1fr; } }
 
@@ -106,15 +121,46 @@
 <div class="app">
   <h1>学历序列就业压力 · 计算器</h1>
   <p class="sub">
-    左边拖动调整排序、把几个放进同一行 = 并列位次；每层填人数。<br>
-    左栏标题里那个<b>可编辑的口径标签</b>默认是「学历」——改成「专业」，整套就按专业看人数。<br>
-    右边填岗位（一个学历区间 + 类型），看区间内每层的<b>挤压阻力（上方）</b>与<b>替代压力（下方）</b>曲线。<br>
-    普通岗按位次分上下：<b>同级或更高都算挤压</b>（同层的人学历等价，投的是同一批岗，是直接竞争对手），更低算替代。<br>
-    考试岗只看分数和门槛，所有人面对同一个池子，压力 = 替代 = 区间内总人数（含本层），是一条<b>水平线</b>，只画一根。<br>
-    颜色区分岗位，<b>实线 = 挤压</b>、<b>虚线 = 替代</b>；同一岗位的两根线永远同色。<br>
-    区间不是硬墙：区间外的学历按<b>边界渗透</b>折算计入，每层再垫一笔<b>基准竞争</b>——所以曲线两端都不会真的归零。
-    纵轴默认<b>对数</b>，否则 500 和 10 万挤在同一根线性轴上，低的那头看不出来。
+    一个岗位放出来，谁在跟你抢？<b>学历比你高的压着你，学历比你低的顶着上来</b>——
+    这个工具把这两股力量按学历一档一档算出来，画成曲线。
   </p>
+
+  <ol class="steps">
+    <li><b>左边填人数</b>——一档学历一行，填这档有多少人。拖动换排序；拖到同一行 = 这两档学历一样好（并列）。</li>
+    <li><b>右边选岗位</b>——挑它招什么学历（比如「二本 ~ 985本」），再选普通岗还是考试岗。</li>
+    <li><b>看曲线</b>——<b>实线 = 被上面挤</b>，<b>虚线 = 被下面顶</b>。线越高，这一档的人竞争越激烈。</li>
+  </ol>
+
+  <details class="more">
+    <summary>规则细节（为什么这么算）</summary>
+    <div>
+      <h3>挤压 / 替代，各算谁</h3>
+      <ul>
+        <li><b>普通岗</b>：挤压 = 学历<b>同级或更高</b>的所有人数，<b>含本档自己</b>；替代 = 学历更低的所有人数。
+          同档为什么也算挤压——这批人学历跟你一样，投的是同一批岗，是直接竞争对手。</li>
+        <li><b>考试岗</b>：过了分数线，学历高低不再分优劣，所有人面对同一个池子。
+          所以挤压 = 替代 = 区间内总人数，结果与「是哪一档」无关，是一条<b>水平线</b>，图上只画一根。</li>
+      </ul>
+
+      <h3>两个可调参数</h3>
+      <ul>
+        <li><b>边界渗透</b>：岗位区间不是硬墙。区间外紧邻的那一档，按这个比例折算计入；再往外按距离递减。</li>
+        <li><b>基准竞争</b>：每档垫一个固定底。不然最底下那档的替代会算成 0。</li>
+      </ul>
+
+      <h3>纵轴为什么默认对数</h3>
+      <p>数据可能差 200 倍（500 到 10 万）。线性轴上最小的那截只占全高 0.5%，会贴死底边、根本看不见。
+        对数轴把两端拉开。代价是纵向间距读的是<b>倍数</b>而不是<b>人数差</b>——想看绝对差值就切成线性，代价是两端重新挤在一起。</p>
+
+      <h3>左边那个金字塔</h3>
+      <p>按学历从低到高画各档人数——低学历人多、高学历人少，画出来天然是个金字塔。
+        淡色带 = 岗位覆盖到的学历，带的两端就是该岗位的上下线。</p>
+
+      <h3>标题里的词可以改</h3>
+      <p>左栏标题那个词默认是「学历」，点一下能改。改成「专业」，整套就按专业看人数——
+        工具不关心这一列装的是什么，它只认「有人群、有人数、有排名」。</p>
+    </div>
+  </details>
 
   <div class="main">
     <section class="panel">
