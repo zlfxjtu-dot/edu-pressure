@@ -165,16 +165,16 @@
   <div class="main">
     <section class="panel">
       <h2><input id="dimLabel" class="dim" type="text" value="学历" maxlength="10"
-        title="这一列装什么：学历 / 专业 / 任意人群。改了这里，标题、提示、人数框的说明都跟着变"
+        title="点一下就能改：这一列装的是什么——学历、专业、或者随便什么人群。改完下面的提示会跟着变"
       >序列</h2>
-      <div class="hint" id="seqHint">拖学历到某一行 = 换位次 / 并列；拖到行与行之间的缝 = 抽出来单独一行；↑↓ 调整行的顺序</div>
+      <div class="hint" id="seqHint">拖动换排序；拖到同一行 = 这两档一样好；拖到两行之间的缝 = 抽出来单独一行；↑↓ 换整行的位置；每格填该学历的人数</div>
       <div id="sequence"></div>
       <button class="btn" id="addLayer">＋ 加学历</button>
 
       <h2 style="margin-top:18px">人数金字塔</h2>
       <div class="hint">
-        按位次自下而上排，柱长 = 该层人数。<br>
-        淡色带 = 岗位区间覆盖到的学历，带的两端就是该岗位的<b>上下线</b>——落在哪两层之间，一眼能看出来。
+        从低到高排，柱子越长 = 这档人越多。<br>
+        淡色带 = 岗位要的学历范围，带子的<b>两端</b>就是这条线卡在哪两档之间。
       </div>
       <div class="legend" id="pyramidLegend"></div>
       <svg id="pyramid" viewBox="0 0 382 200"></svg>
@@ -200,9 +200,10 @@
           </select>
         </label>
         <span class="hint">
-          渗透：区间外紧邻的学历按这个比例计入（再往外按幂衰减）。基准：每层垫的底，让序列两端也不归零。<br>
-          纵轴：数据跨了 200 倍，线性轴下最小的那截（500）只占全高 0.5%，必然贴死底边。
-          对数轴把下界压到最小值以下一整档（200），最低点浮在底线之上；代价是纵向间距读的是<b>倍数</b>不是<b>人数差</b>。
+          这两个是模型的修正项，<b>拿不准就保持默认</b>。<br>
+          <b>渗透</b>：岗位写「二本~985本」，但硕士也可能来投——这一档按这个比例算进来，再往外递减。<br>
+          <b>基准</b>：给每一档垫一个底，不然最底下那档的「替代」会算成 0。<br>
+          <b>纵轴</b>：数据差 200 倍，线性轴上最小的那截会贴死底边看不见，所以默认用对数。想看人数差就切线性（代价是两端挤在一起）。
         </span>
       </div>
       <div class="legend" id="legend"></div>
@@ -261,8 +262,8 @@
   function renderDim() {
     var d = state.dim;
     byId('seqHint').textContent =
-      '拖' + d + '到某一行 = 换位次 / 并列；拖到行与行之间的缝 = 抽出来单独一行；' +
-      '↑↓ 调整行的顺序；每格填该' + d + '的人数';
+      '拖动换排序；拖到同一行 = 这两档一样好；拖到两行之间的缝 = 抽出来单独一行；' +
+      '↑↓ 换整行的位置；每格填该' + d + '的人数';
     countInputs.forEach(function (i) { i.title = d + '人数'; });
   }
   byId('dimLabel').oninput = function () {
@@ -282,8 +283,8 @@
       grp._group = g;
 
       var mv = el('div', 'move');
-      var up = el('button', null, '↑'); up.title = '上移一行';
-      var dn = el('button', null, '↓'); dn.title = '下移一行';
+      var up = el('button', null, '↑'); up.title = '整行上移';
+      var dn = el('button', null, '↓'); dn.title = '整行下移';
       up.onclick = function () { moveGroup(tier, -1); };
       dn.onclick = function () { moveGroup(tier, +1); };
       mv.appendChild(up); mv.appendChild(dn);
@@ -292,7 +293,7 @@
       g.layers.forEach(function (l) {
         var chip = el('div', 'chip');
         chip.draggable = true;
-        chip.title = '拖到别的行 = 换位次/并列';
+        chip.title = '拖到别的行换排序；拖到同一行 = 这两档一样好';
         var nm = el('span', 'nm', l.name);
         var inp = el('input'); inp.type = 'number'; inp.value = l.count; inp.min = 0;
         inp.title = state.dim + '人数';
@@ -328,7 +329,7 @@
         drag = null;
       });
 
-      var tag = el('div', 'tier-tag', '位次 ' + (tier + 1));
+      var tag = el('div', 'tier-tag', '第 ' + (tier + 1) + ' 档');
       grp.appendChild(mv); grp.appendChild(layers); grp.appendChild(tag);
       box.appendChild(grp);
     });
@@ -392,9 +393,9 @@
   }
 
   byId('addLayer').onclick = function () {
-    var name = prompt('学历名称（如 博士 / 大专）');
+    var name = prompt('新的一档叫什么？（比如 博士 / 大专）');
     if (!name) return;
-    var count = prompt('人数', '0');
+    var count = prompt('这档有多少人？', '0');
     state.groups.push({ layers: [{ name: name, count: +count || 0 }] });
     renderAll();
   };
@@ -424,7 +425,7 @@
       r1.appendChild(type); r1.appendChild(del);
 
       var r2 = el('div', 'row');
-      r2.appendChild(el('label', null, '区间'));
+      r2.appendChild(el('label', null, '招哪些'));
       var lower = mkSelect(names, job.lower);
       lower.onchange = function () { job.lower = lower.value; renderOutputs(); };
       r2.appendChild(el('span', null, '~'));
